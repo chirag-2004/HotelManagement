@@ -14,4 +14,6 @@ public interface RoomProjections {
     Boolean getIsAvailable();
     RoomType getRoomType();
     Hotel getHotel();
+//    int a;
+    
 }
