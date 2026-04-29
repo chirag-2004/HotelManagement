@@ -5,156 +5,239 @@ import jakarta.validation.ConstraintViolationException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
-import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
-import org.springframework.test.context.ActiveProfiles;
+import org.springframework.data.domain.PageRequest;
 
 import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.*;
 
 @DataJpaTest
-@ActiveProfiles("test")
-public class AmenityRepositoryTest {
+class AmenityRepositoryTest {
 
     @Autowired
     private AmenityRepository amenityRepository;
 
-    @Autowired
-    private TestEntityManager entityManager;
+    // =======================================================
+    // Helper
+    // =======================================================
 
-    // Helper method
     private Amenity save(String name, String desc) {
-        Amenity a = new Amenity();
-        a.setName(name);
-        a.setDescription(desc);
-        return amenityRepository.save(a);
+        Amenity a = new Amenity(null, name, desc);
+        return amenityRepository.saveAndFlush(a);
     }
 
     // =======================================================
-    // ✅ CORRECT SCENARIOS
+    // CORRECT SCENARIOS
     // =======================================================
 
     @Test
-    public void testSaveAmenity_valid() {
+    void testSaveAmenity_valid() {
         Amenity saved = save("Wi-Fi", "High-speed internet");
-        assertThat(saved).isNotNull();
-        assertThat(saved.getAmenityId()).isNotNull();
+
+        assertNotNull(saved);
+        assertNotNull(saved.getAmenityId());
+        assertEquals("Wi-Fi", saved.getName());
     }
 
     @Test
-    public void testSaveAmenity_persistsFields() {
+    void testSaveAmenity_persistsFields() {
         Amenity saved = save("Gym", "Fitness center");
-        entityManager.flush();
-        entityManager.clear();
 
-        Amenity found = amenityRepository.findById(saved.getAmenityId()).orElseThrow();
-        assertThat(found.getName()).isEqualTo("Gym");
-        assertThat(found.getDescription()).isEqualTo("Fitness center");
+        Optional<Amenity> found =
+                amenityRepository.findById(saved.getAmenityId());
+
+        assertTrue(found.isPresent());
+        assertEquals("Gym", found.get().getName());
+        assertEquals("Fitness center", found.get().getDescription());
     }
 
     @Test
-    public void testUpdateAmenity_valid() {
-        Amenity saved = save("Old", "Old Desc");
+    void testFindByName_valid() {
+        save("Spa", "Relaxation");
 
-        saved.setName("New");
-        saved.setDescription("New Desc");
+        Optional<Amenity> found =
+                amenityRepository.findByName("Spa");
+
+        assertTrue(found.isPresent());
+        assertEquals("Relaxation", found.get().getDescription());
+    }
+
+    @Test
+    void testUpdateAmenity_valid() {
+        Amenity saved = save("Old Name", "Old Description");
+
+        saved.setName("New Name");
+        saved.setDescription("New Description");
+
         amenityRepository.saveAndFlush(saved);
 
-        entityManager.clear();
+        Amenity updated =
+                amenityRepository.findById(saved.getAmenityId()).orElseThrow();
 
-        Amenity updated = amenityRepository.findById(saved.getAmenityId()).orElseThrow();
-        assertThat(updated.getName()).isEqualTo("New");
-        assertThat(updated.getDescription()).isEqualTo("New Desc");
+        assertEquals("New Name", updated.getName());
+        assertEquals("New Description", updated.getDescription());
     }
 
     @Test
-    public void testFindByName_valid() {
-        save("Spa", "Relaxation");
-        Optional<Amenity> found = amenityRepository.findByName("Spa");
+    void testCountAmenities_valid() {
+        save("AA", "Valid Desc AAAAA");
+        save("BB", "Valid Desc BBBBB");
 
-        assertThat(found).isPresent();
-        assertThat(found.get().getDescription()).isEqualTo("Relaxation");
+        long count = amenityRepository.count();
+
+        assertEquals(2, count);
     }
 
     // =======================================================
-    // ❌ INCORRECT SCENARIOS (valid input but no match)
+    // INCORRECT SCENARIOS
     // =======================================================
 
     @Test
-    public void testFindByName_notFound() {
-        Optional<Amenity> found = amenityRepository.findByName("NonExistent");
-        assertThat(found).isEmpty();
+    void testFindByName_notFound() {
+        Optional<Amenity> found =
+                amenityRepository.findByName("Unknown");
+
+        assertTrue(found.isEmpty());
     }
 
     @Test
-    public void testFindByName_caseSensitive() {
-        save("Tennis Court", "Outdoor");
-        Optional<Amenity> found = amenityRepository.findByName("tennis court");
+    void testFindByName_caseSensitive() {
+        save("Tennis Court", "Outdoor court facility");
 
-        assertThat(found).isEmpty();
+        Optional<Amenity> found =
+                amenityRepository.findByName("tennis court");
+
+        assertTrue(found.isEmpty());
     }
 
     @Test
-    public void testUpdateDoesNotCreateNewRecord() {
-        Amenity saved = save("Parking", "Secure");
+    void testUpdateDoesNotCreateNewRecord() {
+        Amenity saved = save("Parking", "Secure parking");
+
         long countBefore = amenityRepository.count();
 
         saved.setName("Updated Parking");
+
         amenityRepository.saveAndFlush(saved);
 
-        assertThat(amenityRepository.count()).isEqualTo(countBefore);
+        long countAfter = amenityRepository.count();
+
+        assertEquals(countBefore, countAfter);
     }
 
     // =======================================================
-    // 🚫 INVALID SCENARIOS (should throw validation errors)
+    // INVALID SCENARIOS
     // =======================================================
 
     @Test
-    public void testSaveAmenity_nullName_shouldFail() {
-        Amenity a = new Amenity();
-        a.setDescription("Desc");
+    void testSaveAmenity_blankName_shouldFail() {
+        Amenity a = new Amenity(
+                null,
+                "",
+                "Valid description here"
+        );
 
-        assertThatThrownBy(() -> {
-            amenityRepository.saveAndFlush(a);
-        }).isInstanceOf(ConstraintViolationException.class);
+        assertThrows(
+                ConstraintViolationException.class,
+                () -> amenityRepository.saveAndFlush(a)
+        );
     }
 
     @Test
-    public void testSaveAmenity_emptyName_shouldFail() {
-        Amenity a = new Amenity();
-        a.setName(""); // invalid
-        a.setDescription("Desc");
+    void testSaveAmenity_nullName_shouldFail() {
+        Amenity a = new Amenity(
+                null,
+                null,
+                "Valid description here"
+        );
 
-        assertThatThrownBy(() -> {
-            amenityRepository.saveAndFlush(a);
-        }).isInstanceOf(ConstraintViolationException.class);
+        assertThrows(
+                ConstraintViolationException.class,
+                () -> amenityRepository.saveAndFlush(a)
+        );
     }
 
     @Test
-    public void testUpdateAmenity_nullName_shouldFail() {
-        Amenity saved = save("Valid Name", "Desc");
-        saved.setName(null);
+    void testSaveAmenity_shortDescription_shouldFail() {
+        Amenity a = new Amenity(
+                null,
+                "Valid Name",
+                "abc"
+        );
 
-        assertThatThrownBy(() -> {
-            amenityRepository.saveAndFlush(saved);
-        }).isInstanceOf(ConstraintViolationException.class);
+        assertThrows(
+                ConstraintViolationException.class,
+                () -> amenityRepository.saveAndFlush(a)
+        );
     }
 
     @Test
-    public void testUpdateAmenity_emptyName_shouldFail() {
-        Amenity saved = save("Valid Name", "Desc");
+    void testUpdateAmenity_blankName_shouldFail() {
+        Amenity saved = save("Valid Name", "Valid Description");
+
         saved.setName("");
 
-        assertThatThrownBy(() -> {
-            amenityRepository.saveAndFlush(saved);
-        }).isInstanceOf(ConstraintViolationException.class);
+        assertThrows(
+                ConstraintViolationException.class,
+                () -> amenityRepository.saveAndFlush(saved)
+        );
     }
 
     @Test
-    public void testSaveAmenity_nullEntity_shouldFail() {
-        assertThatThrownBy(() -> {
-            amenityRepository.saveAndFlush(null);
-        }).isInstanceOf(Exception.class);
+    void testUpdateAmenity_nullName_shouldFail() {
+        Amenity saved = save("Valid Name", "Valid Description");
+
+        saved.setName(null);
+
+        assertThrows(
+                ConstraintViolationException.class,
+                () -> amenityRepository.saveAndFlush(saved)
+        );
     }
+
+    @Test
+    void testSaveAmenity_nullEntity_shouldFail() {
+        assertThrows(
+                Exception.class,
+                () -> amenityRepository.saveAndFlush(null)
+        );
+    }
+    
+ // =======================================================
+ // PAGINATION SCENARIOS
+ // =======================================================
+
+    @Test
+	void testPagination_firstPage() {
+	    save("AA", "Valid Desc AAAAA");
+	    save("BB", "Valid Desc BBBBB");
+	    save("CC", "Valid Desc CCCCC");
+	
+	    var page = amenityRepository.findAll(PageRequest.of(0, 2));
+	
+	    assertEquals(2, page.getContent().size());
+	    assertEquals(3, page.getTotalElements());
+	    assertEquals(2, page.getTotalPages());
+	 }
+
+	 @Test
+	 void testPagination_secondPage() {
+	     save("AA", "Valid Desc AAAAA");
+	     save("BB", "Valid Desc BBBBB");
+	     save("CC", "Valid Desc CCCCC");
+	
+	     var page = amenityRepository.findAll(PageRequest.of(1, 2));
+	
+	     assertEquals(1, page.getContent().size());
+	 }
+	
+	 @Test
+	 void testPagination_emptyPage() {
+	     save("AA", "Valid Desc AAAAA");
+	
+	     var page = amenityRepository.findAll(PageRequest.of(5, 2));
+	
+	     assertTrue(page.getContent().isEmpty());
+	 }
+
 }
