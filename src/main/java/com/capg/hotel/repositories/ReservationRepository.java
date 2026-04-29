@@ -14,7 +14,7 @@ import java.util.Optional;
 )
 public interface ReservationRepository extends JpaRepository<Reservation, Integer> {
 
-    Optional<Reservation> findByGuestName(String guestName);
+    List<Reservation> findByGuestName(String guestName);
 
     List<Reservation> findByGuestPhone(String guestPhone);
 
@@ -25,6 +25,4 @@ public interface ReservationRepository extends JpaRepository<Reservation, Intege
     List<Reservation> findByCheckOutDate(LocalDate checkOutDate);
 
     List<Reservation> findByRoom_RoomId(Integer roomId);
-
-    List<Reservation> findByRoom_RoomNumber(Integer roomNumber);
 }
