@@ -23,40 +23,43 @@ class HotelRepositoryTest {
     @Autowired
     private HotelRepository hotelRepository;
 
-    // Helper Method (safe: creates NEW records, does not affect existing IDs)
     private Hotel save(String name, String location, String description) {
         Hotel hotel = new Hotel(null, name, location, description);
         return hotelRepository.saveAndFlush(hotel);
     }
 
-    // =======================================================
-    // ✅ CORRECT SCENARIOS 
-    // =======================================================
+    // =========================
+    // ✅ CORRECT SCENARIOS
+    // =========================
 
     @Test
     void testSaveHotel_valid() {
         Hotel saved = save(
-                "Grand Plaza Hotel TEST",
-                "Downtown City Center TEST",
-                "Luxury hotel test entry."
+                "Grand Plaza Hotel",
+                "Downtown City Center",
+                "Luxury hotel with stunning views of the city."
         );
 
+        assertNotNull(saved);
         assertNotNull(saved.getHotelId());
-        assertEquals("Grand Plaza Hotel TEST", saved.getName());
+        assertEquals("Grand Plaza Hotel", saved.getName());
+        assertEquals("Downtown City Center", saved.getLocation());
     }
 
     @Test
     void testSaveHotel_persistsFields() {
         Hotel saved = save(
-                "Oceanfront Resort TEST",
-                "Beachfront Paradise TEST",
-                "Test description"
+                "Oceanfront Resort & Spa",
+                "Beachfront Paradise",
+                "Relaxing resort with spa facilities."
         );
 
         Optional<Hotel> found =
                 hotelRepository.findById(saved.getHotelId());
 
         assertTrue(found.isPresent());
+        assertEquals("Oceanfront Resort & Spa", found.get().getName());
+        assertEquals("Beachfront Paradise", found.get().getLocation());
     }
 
     @Test
@@ -70,24 +73,24 @@ class HotelRepositoryTest {
     @Test
     void testUpdateHotel_valid() {
         Hotel saved = save(
-                "Urban Skyline Suites TEST",
-                "Metropolitan Area TEST",
-                "Test desc"
+                "Urban Skyline Suites",
+                "Metropolitan Area",
+                "Chic suites with skyline views."
         );
 
-        saved.setName("Updated Skyline Suites TEST");
+        Integer id = saved.getHotelId();
+
+        saved.setName("Updated Skyline Suites");
+        saved.setLocation("Luxury Skyline");
+
         hotelRepository.saveAndFlush(saved);
 
-        Hotel updated = hotelRepository
-                .findById(saved.getHotelId())
-                .orElseThrow();
+        Hotel updated = hotelRepository.findById(id).orElseThrow();
 
-        assertEquals("Updated Skyline Suites TEST", updated.getName());
+        assertEquals(id, updated.getHotelId());
+        assertEquals("Updated Skyline Suites", updated.getName());
+        assertEquals("Luxury Skyline", updated.getLocation());
     }
-
-    // =======================================================
-    // ✅ PAGINATION 
-    // =======================================================
 
     @Test
     void testPagination_firstPage() {
@@ -95,7 +98,7 @@ class HotelRepositoryTest {
                 hotelRepository.findAll(PageRequest.of(0, 2));
 
         assertEquals(2, page.getContent().size());
-        assertTrue(page.getTotalElements() >= 1); // safer
+        assertTrue(page.getTotalPages() >= 1);
     }
 
     @Test
@@ -106,9 +109,26 @@ class HotelRepositoryTest {
         assertEquals(2, page.getContent().size());
     }
 
-    // =======================================================
-    // ✅ FIND BY NAME 
-    // =======================================================
+    @Test
+    void testSaveHotel_createsRecords() {
+        Hotel h1 = save(
+                "Test Hotel One",
+                "Location One",
+                "Valid description one"
+        );
+
+        Hotel h2 = save(
+                "Test Hotel Two",
+                "Location Two",
+                "Valid description two"
+        );
+
+        Optional<Hotel> f1 = hotelRepository.findById(h1.getHotelId());
+        Optional<Hotel> f2 = hotelRepository.findById(h2.getHotelId());
+
+        assertTrue(f1.isPresent());
+        assertTrue(f2.isPresent());
+    }
 
     @Test
     void testFindByName_valid() {
@@ -119,11 +139,24 @@ class HotelRepositoryTest {
                 );
 
         assertThat(result.getContent()).isNotEmpty();
+        result.getContent().forEach(h ->
+                assertEquals("Seaside Retreat Lodge", h.getName())
+        );
     }
 
-    // =======================================================
-    // ✅ FIND BY LOCATION 
-    // =======================================================
+    @Test
+    void testFindByLocation_singleMatch() {
+        Page<Hotel> result =
+                hotelRepository.findByLocation(
+                        "Pine Forest",
+                        PageRequest.of(0, 10)
+                );
+
+        assertThat(result.getContent()).isNotEmpty();
+        result.getContent().forEach(h ->
+                assertEquals("Pine Forest", h.getLocation())
+        );
+    }
 
     @Test
     void testFindByLocation_multipleMatches() {
@@ -133,16 +166,19 @@ class HotelRepositoryTest {
                         PageRequest.of(0, 10)
                 );
 
-        assertThat(result.getContent()).isNotEmpty();
+        assertThat(result.getContent()).hasSizeGreaterThanOrEqualTo(1);
     }
 
-    // =======================================================
-    // ❌ NEGATIVE CASES
-    // =======================================================
+    // =========================
+    // ❌ INCORRECT SCENARIOS
+    // =========================
 
     @Test
     void testFindById_notFound() {
-        assertTrue(hotelRepository.findById(99999).isEmpty());
+        Optional<Hotel> result =
+                hotelRepository.findById(99999);
+
+        assertTrue(result.isEmpty());
     }
 
     @Test
@@ -157,6 +193,17 @@ class HotelRepositoryTest {
     }
 
     @Test
+    void testFindByName_caseSensitive() {
+        Page<Hotel> result =
+                hotelRepository.findByName(
+                        "whispering pines inn",
+                        PageRequest.of(0, 10)
+                );
+
+        assertThat(result.getContent()).isNotEmpty();
+    }
+
+    @Test
     void testFindByLocation_notFound() {
         Page<Hotel> result =
                 hotelRepository.findByLocation(
@@ -167,9 +214,29 @@ class HotelRepositoryTest {
         assertTrue(result.isEmpty());
     }
 
-    // =======================================================
-    // 🚫 VALIDATION TESTS
-    // =======================================================
+    @Test
+    void testUpdateDoesNotCreateNewRecord() {
+        Hotel saved = save(
+                "Harbor View Hotel",
+                "Harborfront District",
+                "Enjoy scenic harbor views."
+        );
+
+        Integer id = saved.getHotelId();
+
+        saved.setName("Updated Harbor View Hotel");
+        hotelRepository.saveAndFlush(saved);
+
+        Optional<Hotel> updated = hotelRepository.findById(id);
+
+        assertTrue(updated.isPresent());
+        assertEquals(id, updated.get().getHotelId());
+        assertEquals("Updated Harbor View Hotel", updated.get().getName());
+    }
+
+    // =========================
+    // 🚫 INVALID SCENARIOS
+    // =========================
 
     @Test
     void testSaveHotel_blankName_shouldFail() {
@@ -193,11 +260,27 @@ class HotelRepositoryTest {
 
     @Test
     void testSaveHotel_shortDescription_shouldFail() {
-        Hotel hotel = new Hotel(null, "Hotel", "Delhi", "abc");
+        Hotel hotel = new Hotel(null, "Good Hotel", "Delhi", "abc");
 
         assertThrows(
                 ConstraintViolationException.class,
                 () -> hotelRepository.saveAndFlush(hotel)
+        );
+    }
+
+    @Test
+    void testUpdateHotel_blankName_shouldFail() {
+        Hotel saved = save(
+                "City Lights Hotel",
+                "Downtown Core",
+                "Nice view hotel"
+        );
+
+        saved.setName("");
+
+        assertThrows(
+                ConstraintViolationException.class,
+                () -> hotelRepository.saveAndFlush(saved)
         );
     }
 
