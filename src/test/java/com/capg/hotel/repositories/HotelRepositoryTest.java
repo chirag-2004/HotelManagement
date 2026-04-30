@@ -109,7 +109,6 @@ class HotelRepositoryTest {
         assertEquals(2, page.getContent().size());
     }
 
-    // ✅ REPLACED count() TEST
     @Test
     void testSaveHotel_createsRecords() {
         Hotel h1 = save(
@@ -215,7 +214,6 @@ class HotelRepositoryTest {
         assertTrue(result.isEmpty());
     }
 
-    // ✅ REPLACED count() UPDATE TEST
     @Test
     void testUpdateDoesNotCreateNewRecord() {
         Hotel saved = save(
