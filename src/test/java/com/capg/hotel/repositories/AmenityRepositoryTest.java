@@ -20,195 +20,6 @@ class AmenityRepositoryTest {
 
     @Autowired
     private AmenityRepository amenityRepository;
-<<<<<<< HEAD
-
-    // =======================================================
-    // Helper
-    // =======================================================
-
-    private Amenity save(String name, String desc) {
-        Amenity a = new Amenity(null, name, desc);
-        return amenityRepository.saveAndFlush(a);
-    }
-
-    // =======================================================
-    // CORRECT SCENARIOS
-    // =======================================================
-
-    @Test
-    void testSaveAmenity_valid() {
-        Amenity saved = save("Wi-Fi", "High-speed internet");
-
-        assertNotNull(saved);
-        assertNotNull(saved.getAmenityId());
-        assertEquals("Wi-Fi", saved.getName());
-    }
-
-    @Test
-    void testSaveAmenity_persistsFields() {
-        Amenity saved = save("Gym", "Fitness center");
-
-        Optional<Amenity> found =
-                amenityRepository.findById(saved.getAmenityId());
-
-        assertTrue(found.isPresent());
-        assertEquals("Gym", found.get().getName());
-        assertEquals("Fitness center", found.get().getDescription());
-    }
-
-    @Test
-    void testFindByNameContainingIgnoreCase_singleMatch() {
-        save("Swimming Pool", "Outdoor pool");
-
-        var page = amenityRepository
-                .findByNameContainingIgnoreCase("pool", PageRequest.of(0, 5));
-
-        assertEquals(1, page.getContent().size());
-        assertEquals("Swimming Pool", page.getContent().get(0).getName());
-    }
-
-    @Test
-    void testUpdateAmenity_valid() {
-        Amenity saved = save("Old Name", "Old Description");
-
-        saved.setName("New Name");
-        saved.setDescription("New Description");
-
-        amenityRepository.saveAndFlush(saved);
-
-        Amenity updated =
-                amenityRepository.findById(saved.getAmenityId()).orElseThrow();
-
-        assertEquals("New Name", updated.getName());
-        assertEquals("New Description", updated.getDescription());
-    }
-
-    @Test
-    void testCountAmenities_valid() {
-        save("AA", "Valid Desc AAAAA");
-        save("BB", "Valid Desc BBBBB");
-
-        long count = amenityRepository.count();
-
-        assertEquals(2, count);
-    }
-
-    // =======================================================
-    // INCORRECT SCENARIOS
-    // =======================================================
-
-//    @Test
-//    void testFindByName_notFound() {
-//        Optional<Amenity> found =
-//                amenityRepository.findByName("Unknown");
-//
-//        assertTrue(found.isEmpty());
-//    }
-
-//    @Test
-//    void testFindByName_caseSensitive() {
-//        save("Tennis Court", "Outdoor court facility");
-//
-//        Optional<Amenity> found =
-//                amenityRepository.findByName("tennis court");
-//
-//        assertTrue(found.isEmpty());
-//    }
-
-    @Test
-    void testUpdateDoesNotCreateNewRecord() {
-        Amenity saved = save("Parking", "Secure parking");
-
-        long countBefore = amenityRepository.count();
-
-        saved.setName("Updated Parking");
-
-        amenityRepository.saveAndFlush(saved);
-
-        long countAfter = amenityRepository.count();
-
-        assertEquals(countBefore, countAfter);
-    }
-
-    // =======================================================
-    // INVALID SCENARIOS
-    // =======================================================
-
-    @Test
-    void testSaveAmenity_blankName_shouldFail() {
-        Amenity a = new Amenity(
-                null,
-                "",
-                "Valid description here"
-        );
-
-        assertThrows(
-                ConstraintViolationException.class,
-                () -> amenityRepository.saveAndFlush(a)
-        );
-    }
-
-    @Test
-    void testSaveAmenity_nullName_shouldFail() {
-        Amenity a = new Amenity(
-                null,
-                null,
-                "Valid description here"
-        );
-
-        assertThrows(
-                ConstraintViolationException.class,
-                () -> amenityRepository.saveAndFlush(a)
-        );
-    }
-
-    @Test
-    void testSaveAmenity_shortDescription_shouldFail() {
-        Amenity a = new Amenity(
-                null,
-                "Valid Name",
-                "abc"
-        );
-
-        assertThrows(
-                ConstraintViolationException.class,
-                () -> amenityRepository.saveAndFlush(a)
-        );
-    }
-
-    @Test
-    void testUpdateAmenity_blankName_shouldFail() {
-        Amenity saved = save("Valid Name", "Valid Description");
-
-        saved.setName("");
-
-        assertThrows(
-                ConstraintViolationException.class,
-                () -> amenityRepository.saveAndFlush(saved)
-        );
-    }
-
-    @Test
-    void testUpdateAmenity_nullName_shouldFail() {
-        Amenity saved = save("Valid Name", "Valid Description");
-
-        saved.setName(null);
-
-        assertThrows(
-                ConstraintViolationException.class,
-                () -> amenityRepository.saveAndFlush(saved)
-        );
-    }
-
-    @Test
-    void testSaveAmenity_nullEntity_shouldFail() {
-        assertThrows(
-                Exception.class,
-                () -> amenityRepository.saveAndFlush(null)
-        );
-    }
-=======
->>>>>>> 7b5957738d34b7fd1fdd99412f1eff4831574c37
     
     //read tests
     @Test
@@ -278,13 +89,14 @@ class AmenityRepositoryTest {
     //update and add tests
     @Test
     void shouldSaveAmenity() {
-        long before = amenityRepository.count();
-
         Amenity a = new Amenity(null, "Test Amenity", "Valid description here");
+
         Amenity saved = amenityRepository.saveAndFlush(a);
 
         assertNotNull(saved.getAmenityId());
-        assertEquals(before + 1, amenityRepository.count());
+
+        Optional<Amenity> found = amenityRepository.findById(saved.getAmenityId());
+        assertTrue(found.isPresent());
     }
 
     @Test
@@ -292,14 +104,16 @@ class AmenityRepositoryTest {
         Amenity a = new Amenity(null, "Temp Name", "Valid description");
         a = amenityRepository.saveAndFlush(a);
 
+        Integer id = a.getAmenityId();
+
         a.setName("Updated Name");
         a.setDescription("Updated description");
 
         amenityRepository.saveAndFlush(a);
 
-        Amenity updated = amenityRepository.findById(a.getAmenityId())
-                .orElseThrow();
+        Amenity updated = amenityRepository.findById(id).orElseThrow();
 
+        assertEquals(id, updated.getAmenityId());
         assertEquals("Updated Name", updated.getName());
     }
 
@@ -308,14 +122,14 @@ class AmenityRepositoryTest {
         Amenity a = new Amenity(null, "Temp", "Valid description");
         a = amenityRepository.saveAndFlush(a);
 
-        long before = amenityRepository.count();
+        Integer idBefore = a.getAmenityId();
 
         a.setName("Updated Temp");
-        amenityRepository.saveAndFlush(a);
+        Amenity updated = amenityRepository.saveAndFlush(a);
 
-        long after = amenityRepository.count();
+        Integer idAfter = updated.getAmenityId();
 
-        assertEquals(before, after);
+        assertEquals(idBefore, idAfter);
     }
 
     //invalid cases
